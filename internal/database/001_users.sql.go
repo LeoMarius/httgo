@@ -7,6 +7,8 @@ package database
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -18,7 +20,7 @@ VALUES (
     $1,
     $2
 )
-RETURNING id, created_at, updated_at, email, hashed_password
+RETURNING id, created_at, updated_at, email, is_chirpy_red, hashed_password
 `
 
 type CreateUserParams struct {
@@ -34,6 +36,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
+		&i.IsChirpyRed,
 		&i.HashedPassword,
 	)
 	return i, err
@@ -49,7 +52,7 @@ func (q *Queries) DeleteUsers(ctx context.Context) error {
 }
 
 const getUserEmail = `-- name: GetUserEmail :one
-SELECT id, created_at, updated_at, email, hashed_password
+SELECT id, created_at, updated_at, email, is_chirpy_red, hashed_password
 FROM users
 WHERE email = $1
 `
@@ -62,7 +65,61 @@ func (q *Queries) GetUserEmail(ctx context.Context, email string) (User, error) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
+		&i.IsChirpyRed,
 		&i.HashedPassword,
 	)
 	return i, err
+}
+
+const getUserID = `-- name: GetUserID :one
+SELECT id, created_at, updated_at, email, is_chirpy_red, hashed_password
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) GetUserID(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.IsChirpyRed,
+		&i.HashedPassword,
+	)
+	return i, err
+}
+
+const updateUsers = `-- name: UpdateUsers :exec
+UPDATE users
+SET 
+    email = $1,
+    hashed_password = $2,
+    updated_at = NOW()
+WHERE id = $3
+`
+
+type UpdateUsersParams struct {
+	Email          string
+	HashedPassword string
+	ID             uuid.UUID
+}
+
+func (q *Queries) UpdateUsers(ctx context.Context, arg UpdateUsersParams) error {
+	_, err := q.db.ExecContext(ctx, updateUsers, arg.Email, arg.HashedPassword, arg.ID)
+	return err
+}
+
+const upgradeRed = `-- name: UpgradeRed :exec
+UPDATE users
+SET 
+    updated_at = NOW(),
+    is_chirpy_red = TRUE
+WHERE id = $1
+`
+
+func (q *Queries) UpgradeRed(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, upgradeRed, id)
+	return err
 }

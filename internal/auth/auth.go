@@ -132,3 +132,25 @@ func MakeRefreshToken() (string, error) {
 
 	return my_string, nil
 }
+
+func GetAPIKey(headers http.Header) (string, error) {
+
+	// Get the Authorization header
+	authHeader := headers.Get("Authorization")
+	if authHeader == "" {
+		return "", errors.New("authorization header is missing")
+	}
+
+	println(authHeader)
+
+	// Extraire la clé en découpant la chaîne
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("format d'en-tête invalide")
+	}
+
+	println(parts[1])
+
+	// Retourner la clé (la troisième partie)
+	return parts[1], nil
+}

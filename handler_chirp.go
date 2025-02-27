@@ -74,29 +74,49 @@ func (cfg *apiConfig) handlerChirps(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) handlerAllChirps(w http.ResponseWriter, r *http.Request) {
+	// Get the author_id from query parameters, not request body
+	authorIDStr := r.URL.Query().Get("author_id")
 
-	chirps, err := cfg.db.GetAllChirps(r.Context())
+	sort := r.URL.Query().Get("sort")
+
+	var err error
+
+	var dbChiprs []database.Chirp
+
+	if authorIDStr != "" {
+		// Only try to parse the UUID if author_id was provided
+		authorID, err := uuid.Parse(authorIDStr)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid author_id format", err)
+			return
+		}
+		if sort == "desc" {
+			dbChiprs, err = cfg.db.GetChirpsByUserIDDESC(r.Context(), authorID)
+		} else {
+			dbChiprs, err = cfg.db.GetChirpsByUserIDASC(r.Context(), authorID)
+		}
+		// If we have a valid author_id, get chirps for that author
+
+	} else {
+		// If no author_id was provided, get all chirps
+		if sort == "desc" {
+			dbChiprs, err = cfg.db.GetAllChirpsDESC(r.Context())
+		} else {
+			dbChiprs, err = cfg.db.GetAllChirpsASC(r.Context())
+		}
+
+	}
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create user", err)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps", err)
 		return
 	}
 
-	var all_chirp []Chirp
-
-	for _, chirp := range chirps {
-
-		my_chirp := Chirp{
-			ID:        chirp.ID,
-			CreatedAt: chirp.CreatedAt,
-			UpdatedAt: chirp.CreatedAt,
-			Body:      chirp.Body,
-			UserID:    chirp.UserID,
-		}
-
-		all_chirp = append(all_chirp, my_chirp)
+	var chirps []Chirp
+	for _, dbChirp := range dbChiprs {
+		chirps = append(chirps, Chirp(dbChirp)) // Conversion et ajout au slice
 	}
 
-	respondWithJSON(w, http.StatusOK, all_chirp)
+	respondWithJSON(w, http.StatusOK, chirps)
 }
 
 func (cfg *apiConfig) handlerGetOneChirp(w http.ResponseWriter, r *http.Request) {

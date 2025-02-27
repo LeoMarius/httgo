@@ -16,6 +16,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	secret         string
+	polkaKey       string
 }
 
 func main() {
@@ -37,14 +38,20 @@ func main() {
 	const port = "8080"
 
 	secret := os.Getenv("secret")
-	if dbURL == "" {
+	if secret == "" {
 		log.Fatal("secret must be set")
+	}
+
+	polka_key := os.Getenv("POLKA_KEY")
+	if polka_key == "" {
+		log.Fatal("POLKA_KEY must be set")
 	}
 
 	apiCfg := apiConfig{
 		fileserverHits: atomic.Int32{},
 		db:             dbQueries,
 		secret:         secret,
+		polkaKey:       polka_key,
 	}
 
 	mux := http.NewServeMux()
@@ -56,11 +63,16 @@ func main() {
 	mux.HandleFunc("POST /api/chirps", apiCfg.handlerChirps)
 	mux.HandleFunc("GET /api/chirps", apiCfg.handlerAllChirps)
 	mux.HandleFunc("GET /api/chirps/{id}", apiCfg.handlerGetOneChirp)
+	mux.HandleFunc("DELETE /api/chirps/{id}", apiCfg.handlerDeleteChirp)
 
 	mux.HandleFunc("POST /api/users", apiCfg.handlerUsers)
+	mux.HandleFunc("PUT /api/users", apiCfg.handlerEditUsers)
+
 	mux.HandleFunc("POST /api/login", apiCfg.handlerUsersLogin)
 	mux.HandleFunc("POST /api/refresh", apiCfg.handlerRefresh)
 	mux.HandleFunc("POST /api/revoke", apiCfg.handlerRevoke)
+
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.handlerPolkaHooks)
 
 	srv := &http.Server{
 		Addr:    "localhost:" + port,
